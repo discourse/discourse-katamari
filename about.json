@@ -1,0 +1,9 @@
+{
+  "name": "Katamari",
+  "component": true,
+  "authors": "zogstrip",
+  "minimum_discourse_version": "2026.10.0",
+  "assets": {
+    "katamari_logo": "assets/discourse.svg"
+  }
+}

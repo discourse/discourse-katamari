@@ -1,0 +1,157 @@
+.katamari__trigger {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-decoration-line: underline;
+  text-decoration-style: wavy;
+  text-decoration-color: var(--tertiary);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  font: inherit;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--tertiary);
+    text-decoration-color: var(--quaternary);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--tertiary);
+    outline-offset: 3px;
+  }
+
+  &.is-rolling,
+  &.is-collected {
+    visibility: hidden;
+  }
+}
+
+::highlight(katamari-collected) {
+  color: transparent;
+  text-decoration-color: transparent;
+  text-shadow: none;
+}
+
+.katamari {
+  position: fixed;
+  inset: 0;
+  z-index: z("modal", "overlay") - 1;
+  pointer-events: none;
+
+  &__ball {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--secondary);
+    box-shadow:
+      0 0 0 3px var(--tertiary),
+      0 0 2rem rgb(var(--tertiary-rgb), 0.35);
+    transform: translate(-50%, -50%);
+    pointer-events: auto;
+    touch-action: none;
+    cursor: grab;
+    user-select: none;
+
+    &:active {
+      cursor: grabbing;
+    }
+
+    &:focus-visible {
+      outline: 3px dashed var(--primary);
+      outline-offset: 6px;
+    }
+  }
+
+  &__logo {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  &__attachment {
+    position: absolute;
+    max-width: 8em;
+    overflow: hidden;
+    padding: 0.1em 0.3em;
+    border: 1px solid var(--tertiary);
+    border-radius: 0.3em;
+    background: var(--secondary);
+    color: var(--primary);
+    font-size: 0.6rem;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  &__scoreboard {
+    position: absolute;
+    inset-inline-end: max(1rem, env(safe-area-inset-right));
+    bottom: max(1rem, env(safe-area-inset-bottom));
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    box-sizing: border-box;
+    max-width: calc(100vw - 2rem);
+    padding: 0.65rem 1.1rem 0.65rem 0.65rem;
+    border: 2px solid var(--tertiary);
+    border-radius: 3rem;
+    background: linear-gradient(135deg, var(--secondary), var(--tertiary-low));
+    box-shadow: 0 0.4rem 1.5rem rgb(var(--tertiary-rgb), 0.2);
+    color: var(--primary);
+    transform: rotate(-3deg);
+  }
+
+  &__badge-logo {
+    width: 2.5rem;
+    height: 2.5rem;
+    flex-shrink: 0;
+    border-radius: 50%;
+    transform: rotate(12deg);
+  }
+
+  &__score {
+    font-size: clamp(0.9rem, 3vw, 1.2rem);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+    transform-origin: center;
+  }
+
+  &__effect {
+    position: absolute;
+    color: var(--tertiary);
+    font-weight: bold;
+    animation: katamari-pop 650ms ease-out forwards;
+
+    &.--milestone {
+      color: var(--success);
+      font-size: var(--font-up-4);
+    }
+
+    &.--bump {
+      color: var(--quaternary);
+      font-size: var(--font-up-3);
+    }
+  }
+}
+
+@keyframes katamari-pop {
+  from {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(0.8);
+  }
+
+  to {
+    opacity: 0;
+    transform: translate(-50%, -3rem) scale(1.3);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .katamari__effect {
+    animation: none;
+  }
+}

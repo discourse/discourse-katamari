@@ -1,0 +1,11 @@
+en:
+  theme_metadata:
+    description: "Roll a Discourse ball around the page and collect its words."
+  katamari:
+    title: "Katamari"
+    start: "Roll a katamari"
+    ball: "Katamari ball. Use arrow keys or W A S D to roll."
+    started: "Katamari started. Move your mouse, drag the ball, or use arrow keys. Reload the page to finish."
+    score:
+      one: "%{count} word collected"
+      other: "%{count} words collected"
