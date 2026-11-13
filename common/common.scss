@@ -27,6 +27,14 @@
   }
 }
 
+body.katamari-playing :not(.katamari, .katamari *) {
+  user-select: text !important;
+}
+
+body.katamari-playing button.is-collected {
+  -webkit-text-fill-color: transparent;
+}
+
 ::highlight(katamari-collected) {
   color: transparent;
   text-decoration-color: transparent;

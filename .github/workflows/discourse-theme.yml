@@ -19,5 +19,8 @@ jobs:
           node-version: 24
       - run: npm install --global pnpm@12.11.2
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm exec playwright install --with-deps chromium webkit
       - run: pnpm test:browser
+      - run: node --test --test-name-pattern 'selection is disabled' tests/browser.mjs
+        env:
+          BROWSER: webkit
