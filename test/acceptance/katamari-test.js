@@ -1,5 +1,6 @@
 import {
   click,
+  currentURL,
   find,
   findAll,
   triggerKeyEvent,
@@ -12,8 +13,9 @@ import { acceptance } from "discourse/tests/helpers/qunit-helpers";
 acceptance("Katamari", function (needs) {
   needs.pretender((server, helper) => {
     const topic = structuredClone(topicFixtures["/t/280/1.json"]);
+    topic.title = topic.fancy_title = "A katamari topic";
     topic.post_stream.posts[0].cooked =
-      '<p>katamari rolls through words. KATAMARI!</p><p><code>katamari</code> <a href="/">katamari</a> antikatamari</p>';
+      '<p>katamari rolls through words. KATAMARI!</p><p><code>katamari</code> <a href="/">katamari</a> antikatamari</p><aside class="onebox"><h3><a href="/t/another/281">Another katamari topic</a></h3></aside>';
     server.get("/t/280.json", () => helper.response(topic));
     server.get("/t/280/:post_number.json", () => helper.response(topic));
   });
@@ -21,10 +23,12 @@ acceptance("Katamari", function (needs) {
   test("highlights whole words and keeps the round active until reload", async function (assert) {
     await visit("/t/internationalization-localization/280");
     assert
-      .dom(".katamari__trigger")
-      .exists({ count: 2 }, "plain text matches become buttons");
+      .dom(".cooked .katamari__trigger")
+      .exists({ count: 4 }, "plain and linked words become triggers");
     assert.dom("code .katamari__trigger").doesNotExist("code is preserved");
-    assert.dom("a .katamari__trigger").doesNotExist("links are preserved");
+    assert
+      .dom("a button.katamari__trigger")
+      .doesNotExist("links contain no buttons");
 
     await click(".katamari__trigger");
     assert.dom(".katamari__ball").exists("the game starts");
@@ -39,6 +43,17 @@ acceptance("Katamari", function (needs) {
       CSS.highlights.has("katamari-collected"),
       "collection stays enabled"
     );
+  });
+
+  test("post oneboxes activate while topic titles stay untouched", async function (assert) {
+    await visit("/t/internationalization-localization/280");
+    assert.dom("#topic-title .fancy-title .katamari__trigger").doesNotExist();
+    assert.dom(".onebox a .katamari__trigger").exists();
+
+    const url = currentURL();
+    await click(".onebox a .katamari__trigger");
+    assert.dom(".katamari__ball").exists();
+    assert.strictEqual(currentURL(), url);
   });
 
   test("navigation keeps the round running", async function (assert) {

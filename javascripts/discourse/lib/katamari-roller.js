@@ -15,6 +15,7 @@ const EFFECT_LIFETIME = 650;
 const SOUND_INTERVAL = 65;
 const SOUND_VOLUME = 0.08;
 const COLLECTED_HIGHLIGHT = "katamari-collected";
+const PLAYING_CLASS = "katamari-playing";
 const DIRECTIONS = {
   ArrowLeft: [-1, 0],
   a: [-1, 0],
@@ -49,7 +50,8 @@ export default class KatamariRoller {
   #ball;
   #controller = new AbortController();
   #collected = new Highlight();
-  #collectedTriggers = new Set();
+  #collectedElements = new Map();
+  #collectionDirty = true;
   #indexed = new Map();
   #count = 0;
   #contentDirty = true;
@@ -138,11 +140,15 @@ export default class KatamariRoller {
     if (!this.#paused) {
       if (this.#dirty) {
         this.#measure();
+        this.#collectionDirty = true;
       }
 
-      this.#move(seconds, time);
-      this.#collect(time);
-      this.#paint();
+      const moved = this.#move(seconds, time);
+
+      if (moved || this.#collectionDirty) {
+        this.#collectionDirty = this.#collect(time);
+        this.#paint();
+      }
     }
 
     this.#frame = requestAnimationFrame(this.#tick);
@@ -162,6 +168,7 @@ export default class KatamariRoller {
       y: rect.top + rect.height / 2,
     };
     trigger.classList.add("is-rolling");
+    document.body.classList.add(PLAYING_CLASS);
     this.#resize = new ResizeObserver(() => (this.#dirty = true));
     CSS.highlights.set(COLLECTED_HIGHLIGHT, this.#collected);
     this.#resize.observe(document.body);
@@ -182,14 +189,15 @@ export default class KatamariRoller {
     this.#controller.abort();
     this.#resize.disconnect();
     this.#mutations.disconnect();
+    document.body.classList.remove(PLAYING_CLASS);
     this.#audio?.close().catch(() => {});
     this.#trigger.deref()?.classList.remove("is-rolling");
 
-    for (const trigger of this.#collectedTriggers) {
-      trigger.classList.remove("is-collected");
+    for (const element of this.#collectedElements.keys()) {
+      element.classList.remove("is-collected");
     }
 
-    this.#collectedTriggers.clear();
+    this.#collectedElements.clear();
 
     CSS.highlights.delete(COLLECTED_HIGHLIGHT);
     this.#indexed.clear();
@@ -343,10 +351,10 @@ export default class KatamariRoller {
       this.#contentDirty = false;
     }
 
-    for (const trigger of this.#collectedTriggers) {
-      if (!trigger.isConnected) {
-        trigger.classList.remove("is-collected");
-        this.#collectedTriggers.delete(trigger);
+    for (const [element, text] of this.#collectedElements) {
+      if (!element.isConnected || element.textContent !== text) {
+        element.classList.remove("is-collected");
+        this.#collectedElements.delete(element);
       }
     }
 
@@ -407,7 +415,7 @@ export default class KatamariRoller {
     }
 
     const length = Math.hypot(x, y) || 1;
-    const previous = { ...this.#position };
+    const previous = this.#position;
     const radius = this.#radius;
     const next = {
       x: Math.max(
@@ -426,10 +434,14 @@ export default class KatamariRoller {
       ),
     };
 
+    if (next.x === previous.x && next.y === previous.y) {
+      return false;
+    }
+
     for (const rect of this.#obstacles) {
       if (
-        !circleHitsRect({ ...next, radius }, rect) ||
-        circleHitsRect({ ...previous, radius }, rect)
+        !circleHitsRect(next, radius, rect) ||
+        circleHitsRect(previous, radius, rect)
       ) {
         continue;
       }
@@ -451,24 +463,33 @@ export default class KatamariRoller {
     this.#rotation +=
       ((Math.hypot(next.x - previous.x, next.y - previous.y) / radius) * 180) /
       Math.PI;
+    return next.x !== previous.x || next.y !== previous.y;
   }
 
   #collect(time) {
     const attachments = [];
+    const previousCount = this.#count;
+    const previousRadius = this.#radius;
 
     for (const { word, rect } of this.#visibleWords) {
-      if (!circleHitsRect({ ...this.#position, radius: this.#radius }, rect)) {
+      if (!circleHitsRect(this.#position, this.#radius, rect)) {
         continue;
       }
 
       word.collected = true;
       this.#collected.add(word.range);
-      const trigger =
-        word.range.startContainer.parentElement.closest(".katamari__trigger");
+      const node = word.range.startContainer;
+      const parent = node.parentElement;
+      const trigger = parent.closest(".katamari__trigger");
+      const collectedButton =
+        parent.tagName === "BUTTON" &&
+        parent.textContent === node.data &&
+        this.#indexed.get(node).words.every((entry) => entry.collected);
 
-      if (trigger) {
-        trigger.classList.add("is-collected");
-        this.#collectedTriggers.add(trigger);
+      if (trigger || collectedButton) {
+        const element = trigger || parent;
+        element.classList.add("is-collected");
+        this.#collectedElements.set(element, element.textContent);
       }
 
       this.#count++;
@@ -476,30 +497,34 @@ export default class KatamariRoller {
         MAX_RADIUS,
         BASE_RADIUS + Math.sqrt(this.#count) * 2
       );
-      attachments.push({ text: word.text, number: this.#count });
+      attachments[this.#count % MAX_ATTACHMENTS] = word.text;
       const kind = this.#count % MILESTONE === 0 ? "milestone" : "collect";
       this.#effect(kind === "milestone" ? `+${MILESTONE} ✦` : "+1", kind);
       this.#note(time, kind);
     }
 
-    if (!attachments.length) {
-      return;
+    if (this.#count === previousCount) {
+      return false;
     }
 
     this.#visibleWords = this.#visibleWords.filter(
       ({ word }) => !word.collected
     );
-    this.#attach(attachments);
+    this.#attach(attachments, previousCount);
     this.#onScore(this.#count);
+    return this.#radius !== previousRadius;
   }
 
-  #attach(words) {
+  #attach(words, previousCount) {
     const capacity = Math.min(
       MAX_ATTACHMENTS,
       Math.ceil(BASE_ATTACHMENTS * (this.#radius / BASE_RADIUS) ** 2)
     );
 
-    for (const { text, number } of words.slice(-capacity)) {
+    const first = Math.max(previousCount + 1, this.#count - capacity + 1);
+
+    for (let number = first; number <= this.#count; number++) {
+      const text = words[number % MAX_ATTACHMENTS];
       const slot = number % capacity;
       let attachment = this.#attachments[slot];
 
